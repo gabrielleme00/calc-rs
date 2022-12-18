@@ -30,11 +30,9 @@ pub enum Error {
     UnusedTokens,
 }
 
-pub fn calculate<T: AsRef<str>>(expr: T) -> Result<f32, Error> {
-    match parse(expr) {
-        Ok(tokens) => evaluate(postfix(tokens)),
-        Err(error) => Err(error),
-    }
+/// Returns a digit based on the ASCII value of a char.
+fn as_digit(c: char) -> i32 {
+    c as i32 - 48
 }
 
 /// Tokenizes a string of an infix mathematical expression.
@@ -169,7 +167,9 @@ fn evaluate(mut tokens: Vec<Token>) -> Result<f32, Error> {
     Ok(stack.pop().unwrap())
 }
 
-/// Returns a digit based on the ASCII value of a char.
-fn as_digit(c: char) -> i32 {
-    c as i32 - 48
+pub fn calculate<T: AsRef<str>>(expr: T) -> Result<f32, Error> {
+    match parse(expr) {
+        Ok(tokens) => evaluate(postfix(tokens)),
+        Err(error) => Err(error),
+    }
 }
