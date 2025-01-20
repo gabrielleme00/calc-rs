@@ -19,6 +19,22 @@ enum BiOperation {
     Xor,
 }
 
+impl std::fmt::Display for BiOperation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", match self {
+            Self::Add => "+",
+            Self::Sub => "-",
+            Self::Mul => "*",
+            Self::Div => "/",
+            Self::Mod => "%",
+            Self::Pow => "**",
+            Self::And => "&",
+            Self::Or => "|",
+            Self::Xor => "^",
+        })
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 enum Token {
     Operand(i32),
@@ -120,6 +136,18 @@ fn parse<T: AsRef<str>>(expr: T) -> Result<Vec<Token>, CalcError> {
     Ok(tokens)
 }
 
+/// Returns the priority of a given Token.
+fn precedence(op: &Token) -> i32 {
+    use Token::*;
+    use BiOperation::*;
+
+    match op {
+        BiOperator(Add) | BiOperator(Sub) => 1,
+        BiOperator(Mul) | BiOperator(Div) => 2,
+        _ => 0,
+    }
+}
+
 /// Transforms infix tokens into postfix (RPN).
 fn postfix(mut tokens: Vec<Token>) -> Vec<Token> {
     use Token::*;
@@ -133,17 +161,23 @@ fn postfix(mut tokens: Vec<Token>) -> Vec<Token> {
         match token {
             Operand(_) | UnOperator(_) => queue.push(token),
             BiOperator(_) => {
-                while !stack.is_empty() && stack[stack.len() - 1] >= token {
-                    queue.push(stack.pop().unwrap());
+                while let Some(last_token) = stack.last() {
+                    if precedence(last_token) >= precedence(&token) {
+                        queue.push(stack.pop().unwrap());
+                    } else {
+                        break;
+                    }
                 }
                 stack.push(token);
             }
             Bracket('(') => stack.push(token),
             Bracket(')') => {
-                while !stack.is_empty() && stack[stack.len() - 1] != Bracket('(') {
-                    queue.push(stack.pop().unwrap());
+                while let Some(op) = stack.pop() {
+                    if op == Bracket('(') {
+                        break;
+                    }
+                    queue.push(op);
                 }
-                stack.pop();
             }
             _ => {}
         }
@@ -215,3 +249,58 @@ pub fn calculate<T: AsRef<str>>(expr: T) -> Result<f32, CalcError> {
         Err(error) => Err(error),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::f32::INFINITY;
+
+    use super::*;
+
+    #[test]
+    fn test_basic_operations() {
+        assert_eq!(calculate("100 + 200").unwrap(), 300.0);
+        assert_eq!(calculate("20 - 1").unwrap(), 19.0);
+        assert_eq!(calculate("3 * 40").unwrap(), 120.0);
+        assert_eq!(calculate("8 / 2").unwrap(), 4.0);
+    }
+
+    #[test]
+    fn test_complex_expressions() {
+        let result = calculate("3 + (2 * (5 - (4 / 2)))").unwrap();
+        assert_eq!(result, 9.0);
+        
+        let result = calculate("(10 + (30 / (2*3)) - 20)").unwrap();
+        assert_eq!(result, -5.0);
+    }
+
+    #[test]
+    fn test_order_of_operations() {
+        assert_eq!(calculate("1 + 2 * 3").unwrap(), 7.0);
+        assert_eq!(calculate("(1 + 2) * 3").unwrap(), 9.0);
+        assert_eq!(calculate("8 - 4 / 2").unwrap(), 6.0);
+    }
+
+    #[test]
+    fn test_unary_operations() {
+        assert_eq!(calculate("-5").unwrap(), -5.0);
+        assert_eq!(calculate("--5").unwrap(), 5.0);
+        assert_eq!(calculate("---5").unwrap(), -5.0);
+        assert_eq!(calculate("-3 + 5").unwrap(), 2.0);
+    }
+
+    #[test]
+    fn test_bitwise_operations() {
+        assert_eq!(calculate("1 & 3").unwrap(), 1.0); // AND
+        assert_eq!(calculate("1 | 2").unwrap(), 3.0); // OR
+        assert_eq!(calculate("3 ^ 4").unwrap(), 7.0); // XOR
+    }
+
+    #[test]
+    fn test_error_handling() {
+        assert!(calculate("1 +").is_err());
+        assert!(calculate("* 3").is_err());
+        assert!(calculate("(1 + 2").is_err());
+        assert_eq!(calculate("3 / 0").unwrap(), INFINITY);
+    }
+}
+

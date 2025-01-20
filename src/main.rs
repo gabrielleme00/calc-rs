@@ -8,7 +8,7 @@ fn main() -> Result<(), CalcError> {
         match std::io::stdin().read_line(&mut input) {
             Ok(_) => {
                 match calculate(input) {
-                    Ok(result) => println!("{}", result),
+                    Ok(result) => println!("= {}", result),
                     Err(error) => println!("Error: {}", error),
                 }
             }
