@@ -23,11 +23,22 @@ enum Token {
 }
 
 #[derive(Debug)]
-pub enum Error {
+pub enum CalcError {
     BadToken(char),
     MismatchedParens,
     MissingOperand,
     UnusedTokens,
+}
+
+impl std::fmt::Display for CalcError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            CalcError::BadToken(c) => write!(f, "Bad token encountered: '{}'", c),
+            CalcError::MismatchedParens => write!(f, "Mismatched parentheses"),
+            CalcError::MissingOperand => write!(f, "Missing operand"),
+            CalcError::UnusedTokens => write!(f, "There are unused tokens"),
+        }
+    }
 }
 
 /// Returns a digit based on the ASCII value of a char.
@@ -36,7 +47,7 @@ fn as_digit(c: char) -> i32 {
 }
 
 /// Tokenizes a string of an infix mathematical expression.
-fn parse<T: AsRef<str>>(expr: T) -> Result<Vec<Token>, Error> {
+fn parse<T: AsRef<str>>(expr: T) -> Result<Vec<Token>, CalcError> {
     let expr = expr.as_ref();
     let chars = expr.chars();
     let mut tokens: Vec<Token> = Vec::new();
@@ -55,10 +66,10 @@ fn parse<T: AsRef<str>>(expr: T) -> Result<Vec<Token>, Error> {
                 tokens.push(Token::Bracket(c));
                 if let Some(p) = parens.pop() {
                     if p != '(' {
-                        return Err(Error::MismatchedParens);
+                        return Err(CalcError::MismatchedParens);
                     }
                 } else {
-                    return Err(Error::MismatchedParens);
+                    return Err(CalcError::MismatchedParens);
                 }
             }
             '+' => match tokens.last() {
@@ -78,12 +89,12 @@ fn parse<T: AsRef<str>>(expr: T) -> Result<Vec<Token>, Error> {
             '%' => tokens.push(Token::BiOp(BiOperator::Mod)),
             '^' => tokens.push(Token::BiOp(BiOperator::Pow)),
             ' ' | '\n' | '\r' => {}
-            _ => return Err(Error::BadToken(c)),
+            _ => return Err(CalcError::BadToken(c)),
         }
     }
 
     if parens.len() > 0 {
-        return Err(Error::MismatchedParens);
+        return Err(CalcError::MismatchedParens);
     }
 
     Ok(tokens)
@@ -124,7 +135,7 @@ fn postfix(mut tokens: Vec<Token>) -> Vec<Token> {
 }
 
 /// Evaluates an RPL expression.
-fn evaluate(mut tokens: Vec<Token>) -> Result<f32, Error> {
+fn evaluate(mut tokens: Vec<Token>) -> Result<f32, CalcError> {
     let mut stack: Vec<f32> = Vec::new();
     let mut unary: Vec<UnOperator> = Vec::new();
 
@@ -145,7 +156,7 @@ fn evaluate(mut tokens: Vec<Token>) -> Result<f32, Error> {
             Token::BiOp(operator) => {
                 let (right, left): (f32, f32) = match (stack.pop(), stack.pop()) {
                     (Some(n1), Some(n2)) => (n1, n2),
-                    _ => return Err(Error::MissingOperand),
+                    _ => return Err(CalcError::MissingOperand),
                 };
                 match operator {
                     BiOperator::Add => stack.push(left + right),
@@ -161,13 +172,13 @@ fn evaluate(mut tokens: Vec<Token>) -> Result<f32, Error> {
     }
 
     if stack.len() > 1 {
-        return Err(Error::UnusedTokens);
+        return Err(CalcError::UnusedTokens);
     }
 
     Ok(stack.pop().unwrap())
 }
 
-pub fn calculate<T: AsRef<str>>(expr: T) -> Result<f32, Error> {
+pub fn calculate<T: AsRef<str>>(expr: T) -> Result<f32, CalcError> {
     match parse(expr) {
         Ok(tokens) => evaluate(postfix(tokens)),
         Err(error) => Err(error),
